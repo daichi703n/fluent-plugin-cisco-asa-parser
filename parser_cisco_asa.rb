@@ -12,9 +12,19 @@ module Fluent
       IP = "(?:#{IPV4}|#{IPV6})"
       IPORHOST = '[\w:.-]+'
       ACTION = '(?:denied|permitted)'
-      RGX1 = /^(?<time>#{TIME}) (?<ip_fw>#{IP}) [^ ]* access-list [^ ]* (?<action>#{ACTION}) (?<proto>\w+) \w+\/(?<ip_src>#{IPORHOST})\((?<port_src>\d+)\) -> \w+\/(?<ip_dst>#{IPORHOST})\((?<port_dst>\d+)\)/
-      RGX2 = /^(?<time>#{TIME}) (?<ip_fw>#{IP}) [^ ]* Inbound (?<proto>TCP) connection (?<action>#{ACTION}) from (?<ip_src>#{IPORHOST})\/(?<port_src>\d+) to (?<ip_dst>#{IPORHOST})\/(?<port_dst>\d+)/
-      RGX3 = /^(?<time>#{TIME}) (?<ip_fw>#{IP}) [^ ]* (?<action>Teardown) dynamic (?<proto>(?:TCP|UDP)) translation from \w+:(?<ip_src>#{IPORHOST})\/(?<port_src>\d+) to \w+:(?<ip_dst>#{IPORHOST})\/(?<port_dst>\d+)/
+      CONNECT = '(?:Built|Teardown)'
+      DIRECTION = '(?:inbound|outbound)'
+
+      # For NAT Connection
+      RGX1 = /^(?<time>#{TIME}) (?<ip_fw>[^ ]+) [^ ]+ (?<action>#{CONNECT}) (?<nat>dynamic) (?<proto>(?:TCP|UDP|ICMP)) translation from (?<if_src>\w+):(?<ip_src>#{IPORHOST})\/(?<port_src>\d+) to (?<if_dst>\w+):(?<ip_dst>#{IPORHOST})\/(?<port_dst>\d+)/
+
+      # For ICMP Connection Built
+      RGX2 = /^(?<time>#{TIME}) (?<ip_fw>[^ ]+) [^ ]+ (?<action>#{CONNECT}) (?<direction>#{DIRECTION}) (?<proto>ICMP) connection for faddr (?<ip_src>#{IPORHOST})\/(?<port_src>\d+) gaddr (?<ip_dst>#{IPORHOST})\/(?<port_dst>\d+) laddr (?<ip_local>#{IPORHOST})\/(?<port_local>\d+)/
+
+      # For TCP/UDP Connection Built
+      RGX3 = /^(?<time>#{TIME}) (?<ip_fw>[^ ]+) [^ ]+ (?<action>#{CONNECT}) (?<direction>#{DIRECTION}) (?<proto>(?:TCP|UDP)) .* (?<if_src>\w+):(?<ip_src>#{IPORHOST})\/(?<port_src>\d+) \(.*\) to (?<if_dst>\w+):(?<ip_dst>#{IPORHOST})\/(?<port_dst>\d+) .*/
+
+      ### ToDo Update the format ###
       RGX4 = /^(?<time>#{TIME}) (?<ip_fw>#{IP}) [^ ]* (?<action>Deny) inbound (?<proto>UDP) from (?<ip_src>#{IPORHOST})\/(?<port_src>\d+) to (?<ip_dst>#{IPORHOST})\/(?<port_dst>\d+)/
       RGX5 = /^(?<time>#{TIME}) (?<ip_fw>#{IP}) [^ ]* (?<action>Deny) (?<proto>(?:TCP|UDP|ICMP|IPv6-ICMP)) reverse path check from (?<ip_src>#{IPORHOST}) to (?<ip_dst>#{IPORHOST})/
       RGX6 = /^(?<time>#{TIME}) (?<ip_fw>#{IP}) [^ ]* (?<action>Deny) inbound (?<proto>icmp) src \w+:(?<ip_src>#{IPORHOST}) dst \w+:(?<ip_dst>#{IPORHOST}) \(type (?<icmp_type>\d), code (?<icmp_code>\d)\)/
@@ -45,11 +55,17 @@ module Fluent
           time = @time_parser.parse(m['time'])
           record["ip_fw"] = m['ip_fw']
           record["action"] = m['action']
+          record["direction"] = m['direction']
           record["proto"] = m['proto'].downcase
+          record["nat"] = m['nat']
+          record["if_src"] = m['if_src']
+          record["if_dst"] = m['if_dst']
           record["ip_src"] = m['ip_src']
           record["ip_dst"] = m['ip_dst']
+          record["ip_local"] = m['ip_local']
           record["port_src"] = m['port_src'].to_i if m['port_src']
           record["port_dst"] = m['port_dst'].to_i if m['port_dst']
+          record["port_local"] = m['port_local'].to_i if m['port_local']
           record["icmp_type"] = m['icmp_type'].to_i if m['icmp_type']
           record["icmp_code"] = m['icmp_code'].to_i if m['icmp_code']
           
